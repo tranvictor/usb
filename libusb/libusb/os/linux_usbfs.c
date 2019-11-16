@@ -137,7 +137,7 @@ static int init_count = 0;
 /* Serialize hotplug start/stop */
 static usbi_mutex_static_t linux_hotplug_startstop_lock = USBI_MUTEX_INITIALIZER;
 /* Serialize scan-devices, event-thread, and poll */
-usbi_mutex_static_t linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
+usbi_mutex_static_t v_linux_hotplug_lock = USBI_MUTEX_INITIALIZER;
 
 static int linux_start_event_monitor(void);
 static int linux_stop_event_monitor(void);
@@ -532,7 +532,7 @@ static int linux_start_event_monitor(void)
 #if defined(USE_UDEV)
 	return linux_udev_start_event_monitor();
 #else
-	return linux_netlink_start_event_monitor();
+	return v_linux_netlink_start_event_monitor();
 #endif
 }
 
@@ -541,7 +541,7 @@ static int linux_stop_event_monitor(void)
 #if defined(USE_UDEV)
 	return linux_udev_stop_event_monitor();
 #else
-	return linux_netlink_stop_event_monitor();
+	return v_linux_netlink_stop_event_monitor();
 #endif
 }
 
@@ -549,7 +549,7 @@ static int linux_scan_devices(struct libusb_context *ctx)
 {
 	int ret;
 
-	usbi_mutex_static_lock(&linux_hotplug_lock);
+	usbi_mutex_static_lock(&v_linux_hotplug_lock);
 
 #if defined(USE_UDEV)
 	ret = linux_udev_scan_devices(ctx);
@@ -557,7 +557,7 @@ static int linux_scan_devices(struct libusb_context *ctx)
 	ret = linux_default_scan_devices(ctx);
 #endif
 
-	usbi_mutex_static_unlock(&linux_hotplug_lock);
+	usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 
 	return ret;
 }
@@ -567,7 +567,7 @@ static void op_hotplug_poll(void)
 #if defined(USE_UDEV)
 	linux_udev_hotplug_poll();
 #else
-	linux_netlink_hotplug_poll();
+	v_linux_netlink_hotplug_poll();
 #endif
 }
 
@@ -685,7 +685,7 @@ static int sysfs_get_active_config(struct libusb_device *dev, int *config)
 	return 0;
 }
 
-int linux_get_device_address (struct libusb_context *ctx, int detached,
+int v_linux_get_device_address (struct libusb_context *ctx, int detached,
 	uint8_t *busnum, uint8_t *devaddr,const char *dev_node,
 	const char *sys_name)
 {
@@ -1115,7 +1115,7 @@ retry:
 	return LIBUSB_SUCCESS;
 }
 
-int linux_enumerate_device(struct libusb_context *ctx,
+int v_linux_enumerate_device(struct libusb_context *ctx,
 	uint8_t busnum, uint8_t devaddr, const char *sysfs_dir)
 {
 	unsigned long session_id;
@@ -1162,18 +1162,18 @@ out:
 	return r;
 }
 
-void linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_name)
+void v_linux_hotplug_enumerate(uint8_t busnum, uint8_t devaddr, const char *sys_name)
 {
 	struct libusb_context *ctx;
 
 	usbi_mutex_static_lock(&v_active_contexts_lock);
 	list_for_each_entry(ctx, &v_active_contexts_list, list, struct libusb_context) {
-		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
+		v_linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 	}
 	usbi_mutex_static_unlock(&v_active_contexts_lock);
 }
 
-void linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
+void v_linux_device_disconnected(uint8_t busnum, uint8_t devaddr)
 {
 	struct libusb_context *ctx;
 	struct libusb_device *dev;
@@ -1223,7 +1223,7 @@ static int usbfs_scan_busdir(struct libusb_context *ctx, uint8_t busnum)
 			continue;
 		}
 
-		if (linux_enumerate_device(ctx, busnum, (uint8_t) devaddr, NULL)) {
+		if (v_linux_enumerate_device(ctx, busnum, (uint8_t) devaddr, NULL)) {
 			usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
 			continue;
 		}
@@ -1257,7 +1257,7 @@ static int usbfs_get_device_list(struct libusb_context *ctx)
 			if (!_is_usbdev_entry(entry, &busnum, &devaddr))
 				continue;
 
-			r = linux_enumerate_device(ctx, busnum, (uint8_t) devaddr, NULL);
+			r = v_linux_enumerate_device(ctx, busnum, (uint8_t) devaddr, NULL);
 			if (r < 0) {
 				usbi_dbg("failed to enumerate dir entry %s", entry->d_name);
 				continue;
@@ -1286,12 +1286,12 @@ static int sysfs_scan_device(struct libusb_context *ctx, const char *devname)
 	uint8_t busnum, devaddr;
 	int ret;
 
-	ret = linux_get_device_address (ctx, 0, &busnum, &devaddr, NULL, devname);
+	ret = v_linux_get_device_address (ctx, 0, &busnum, &devaddr, NULL, devname);
 	if (LIBUSB_SUCCESS != ret) {
 		return ret;
 	}
 
-	return linux_enumerate_device(ctx, busnum & 0xff, devaddr & 0xff,
+	return v_linux_enumerate_device(ctx, busnum & 0xff, devaddr & 0xff,
 		devname);
 }
 
@@ -1361,13 +1361,13 @@ static int op_open(struct libusb_device_handle *handle)
 		if (hpriv->fd == LIBUSB_ERROR_NO_DEVICE) {
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
-			usbi_mutex_static_lock(&linux_hotplug_lock);
+			usbi_mutex_static_lock(&v_linux_hotplug_lock);
 			if (handle->dev->attached) {
 				usbi_dbg("open failed with no device, but device still attached");
-				linux_device_disconnected(handle->dev->bus_number,
+				v_linux_device_disconnected(handle->dev->bus_number,
 						handle->dev->device_address);
 			}
-			usbi_mutex_static_unlock(&linux_hotplug_lock);
+			usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 		}
 		return hpriv->fd;
 	}
@@ -2696,11 +2696,11 @@ static int op_handle_events(struct libusb_context *ctx,
 
 			/* device will still be marked as attached if hotplug monitor thread
 			 * hasn't processed remove event yet */
-			usbi_mutex_static_lock(&linux_hotplug_lock);
+			usbi_mutex_static_lock(&v_linux_hotplug_lock);
 			if (handle->dev->attached)
-				linux_device_disconnected(handle->dev->bus_number,
+				v_linux_device_disconnected(handle->dev->bus_number,
 						handle->dev->device_address);
-			usbi_mutex_static_unlock(&linux_hotplug_lock);
+			usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 
 			if (hpriv->caps & USBFS_CAP_REAP_AFTER_DISCONNECT) {
 				do {

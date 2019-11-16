@@ -96,7 +96,7 @@ static int set_fd_cloexec_nb(int fd, int socktype)
 	return 0;
 }
 
-int linux_netlink_start_event_monitor(void)
+int v_linux_netlink_start_event_monitor(void)
 {
 	struct sockaddr_nl sa_nl = { .nl_family = AF_NETLINK, .nl_groups = NL_GROUP_KERNEL };
 	int socktype = SOCK_RAW | SOCK_NONBLOCK | SOCK_CLOEXEC;
@@ -157,7 +157,7 @@ err:
 	return LIBUSB_ERROR_OTHER;
 }
 
-int linux_netlink_stop_event_monitor(void)
+int v_linux_netlink_stop_event_monitor(void)
 {
 	char dummy = 1;
 	ssize_t r;
@@ -350,9 +350,9 @@ static int linux_netlink_read_message(void)
 
 	/* signal device is available (or not) to all contexts */
 	if (detached)
-		linux_device_disconnected(busnum, devaddr);
+		v_linux_device_disconnected(busnum, devaddr);
 	else
-		linux_hotplug_enumerate(busnum, devaddr, sys_name);
+		v_linux_hotplug_enumerate(busnum, devaddr, sys_name);
 
 	return 0;
 }
@@ -386,9 +386,9 @@ static void *linux_netlink_event_thread_main(void *arg)
 			break;
 		}
 		if (fds[1].revents & POLLIN) {
-			usbi_mutex_static_lock(&linux_hotplug_lock);
+			usbi_mutex_static_lock(&v_linux_hotplug_lock);
 			linux_netlink_read_message();
-			usbi_mutex_static_unlock(&linux_hotplug_lock);
+			usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 		}
 	}
 
@@ -397,13 +397,13 @@ static void *linux_netlink_event_thread_main(void *arg)
 	return NULL;
 }
 
-void linux_netlink_hotplug_poll(void)
+void v_linux_netlink_hotplug_poll(void)
 {
 	int r;
 
-	usbi_mutex_static_lock(&linux_hotplug_lock);
+	usbi_mutex_static_lock(&v_linux_hotplug_lock);
 	do {
 		r = linux_netlink_read_message();
 	} while (r == 0);
-	usbi_mutex_static_unlock(&linux_hotplug_lock);
+	usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 }

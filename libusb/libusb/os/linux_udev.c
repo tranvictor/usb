@@ -203,11 +203,11 @@ static void *linux_udev_event_thread_main(void *arg)
 			break;
 		}
 		if (fds[1].revents & POLLIN) {
-			usbi_mutex_static_lock(&linux_hotplug_lock);
+			usbi_mutex_static_lock(&v_linux_hotplug_lock);
 			udev_dev = udev_monitor_receive_device(udev_monitor);
 			if (udev_dev)
 				udev_hotplug_event(udev_dev);
-			usbi_mutex_static_unlock(&linux_hotplug_lock);
+			usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 		}
 	}
 
@@ -231,7 +231,7 @@ static int udev_device_info(struct libusb_context *ctx, int detached,
 		return LIBUSB_ERROR_OTHER;
 	}
 
-	return linux_get_device_address(ctx, detached, busnum, devaddr,
+	return v_linux_get_device_address(ctx, detached, busnum, devaddr,
 					dev_node, *sys_name);
 }
 
@@ -259,9 +259,9 @@ static void udev_hotplug_event(struct udev_device* udev_dev)
 		usbi_dbg("udev hotplug event. action: %s.", udev_action);
 
 		if (strncmp(udev_action, "add", 3) == 0) {
-			linux_hotplug_enumerate(busnum, devaddr, sys_name);
+			v_linux_hotplug_enumerate(busnum, devaddr, sys_name);
 		} else if (detached) {
-			linux_device_disconnected(busnum, devaddr);
+			v_linux_device_disconnected(busnum, devaddr);
 		} else {
 			usbi_err(NULL, "ignoring udev action %s", udev_action);
 		}
@@ -304,7 +304,7 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 			continue;
 		}
 
-		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
+		v_linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 		udev_device_unref(udev_dev);
 	}
 
@@ -317,7 +317,7 @@ void linux_udev_hotplug_poll(void)
 {
 	struct udev_device* udev_dev;
 
-	usbi_mutex_static_lock(&linux_hotplug_lock);
+	usbi_mutex_static_lock(&v_linux_hotplug_lock);
 	do {
 		udev_dev = udev_monitor_receive_device(udev_monitor);
 		if (udev_dev) {
@@ -325,5 +325,5 @@ void linux_udev_hotplug_poll(void)
 			udev_hotplug_event(udev_dev);
 		}
 	} while (udev_dev);
-	usbi_mutex_static_unlock(&linux_hotplug_lock);
+	usbi_mutex_static_unlock(&v_linux_hotplug_lock);
 }
